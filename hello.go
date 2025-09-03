@@ -1,7 +1,16 @@
 package main
 
-import "fmt"
+import (
+    "fmt"
+    "os"
+)
+
+var version = ""
 
 func main() {
-    fmt.Println("Hello, world! v.1.1")
+    if len(os.Args) > 1 && os.Args[1] == "version" {
+        fmt.Println(version)
+        return
+    }
+    fmt.Println("Hello, world! v1")
 }
