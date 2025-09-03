@@ -12,5 +12,5 @@ func main() {
         fmt.Println(version)
         return
     }
-    fmt.Println("Hello, world! v10")
+    fmt.Println("Hello, world! main")
 }
