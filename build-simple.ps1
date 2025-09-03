@@ -1,11 +1,32 @@
 # Quick Build Script
 # Simple version of the build script for basic usage
 
-$version = git describe --tags --abbrev=0 2>$null
-if (-not $version) {
-    Write-Host "No git tags found. Creating v1.0.0..." -ForegroundColor Yellow
-    git tag v1.0.0
-    $version = "v1.0.0"
+# Get current branch name
+$currentBranch = git branch --show-current
+
+# Get version based on current branch
+if ($currentBranch -eq "v1") {
+    $version = git tag -l "v1.*" | Sort-Object -Descending | Select-Object -First 1
+    if (-not $version) {
+        Write-Host "No v1 tags found. Creating v1.0.0..." -ForegroundColor Yellow
+        git tag v1.0.0
+        $version = "v1.0.0"
+    }
+} elseif ($currentBranch -eq "v2") {
+    $version = git tag -l "v2.*" | Sort-Object -Descending | Select-Object -First 1
+    if (-not $version) {
+        Write-Host "No v2 tags found. Creating v2.0.0..." -ForegroundColor Yellow
+        git tag v2.0.0
+        $version = "v2.0.0"
+    }
+} else {
+    # For main or other branches, use latest tag
+    $version = git describe --tags --abbrev=0 2>$null
+    if (-not $version) {
+        Write-Host "No git tags found. Creating v1.0.0..." -ForegroundColor Yellow
+        git tag v1.0.0
+        $version = "v1.0.0"
+    }
 }
 
 $versionClean = $version.TrimStart('v')

@@ -57,11 +57,33 @@ if (-not (Test-Path ".\rcedit.exe")) {
 Write-Info "Getting version from git..."
 
 try {
-    $gitTag = git describe --tags --abbrev=0 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "No git tags found. Creating default tag v1.0.0"
-        git tag v1.0.0
-        $gitTag = "v1.0.0"
+    # Get current branch name
+    $currentBranch = git branch --show-current
+    Write-Info "Current branch: $currentBranch"
+    
+    # Get version based on current branch
+    if ($currentBranch -eq "v1") {
+        $gitTag = git tag -l "v1.*" | Sort-Object -Descending | Select-Object -First 1
+        if (-not $gitTag) {
+            Write-Warning "No v1 tags found. Creating v1.0.0"
+            git tag v1.0.0
+            $gitTag = "v1.0.0"
+        }
+    } elseif ($currentBranch -eq "v2") {
+        $gitTag = git tag -l "v2.*" | Sort-Object -Descending | Select-Object -First 1
+        if (-not $gitTag) {
+            Write-Warning "No v2 tags found. Creating v2.0.0"
+            git tag v2.0.0
+            $gitTag = "v2.0.0"
+        }
+    } else {
+        # For main or other branches, use latest tag
+        $gitTag = git describe --tags --abbrev=0 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "No git tags found. Creating default tag v1.0.0"
+            git tag v1.0.0
+            $gitTag = "v1.0.0"
+        }
     }
     
     Write-Success "Git tag: $gitTag"
