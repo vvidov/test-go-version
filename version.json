@@ -19,20 +19,25 @@
     "FileSubType": "00"
   },
   "StringFileInfo": {
-    "Comments": "Go Hello World Example",
-    "CompanyName": "Your Company",
-    "FileDescription": "Hello World Program",
+    "Comments": "",
+    "CompanyName": "Test Company",
+    "FileDescription": "Hello World Application",
     "FileVersion": "3.0.0.0",
     "InternalName": "hello.exe",
-    "LegalCopyright": "Copyright (C) 2025",
+    "LegalCopyright": "© 2025 Test Company",
+    "LegalTrademarks": "",
     "OriginalFilename": "hello.exe",
-    "ProductName": "HelloApp",
-    "ProductVersion": "3.0.0.0"
+    "PrivateBuild": "",
+    "ProductName": "Hello World",
+    "ProductVersion": "3.0.0.0",
+    "SpecialBuild": ""
   },
   "VarFileInfo": {
     "Translation": {
       "LangID": "0409",
       "CharsetID": "04B0"
     }
-  }
+  },
+  "IconPath": "",
+  "ManifestPath": ""
 }
