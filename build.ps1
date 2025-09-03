@@ -61,23 +61,26 @@ try {
     $currentBranch = git branch --show-current
     Write-Info "Current branch: $currentBranch"
     
-    # Get version based on current branch
-    if ($currentBranch -eq "v1") {
-        $gitTag = git tag -l "v1.*" | Sort-Object -Descending | Select-Object -First 1
+    # Smart version detection based on branch pattern
+    if ($currentBranch -match "^v(\d+)$") {
+        # Branch matches pattern v1, v2, v3, etc.
+        $branchVersion = $matches[1]
+        $versionPattern = "v$branchVersion.*"
+        
+        Write-Info "Detected version branch: $currentBranch (looking for $versionPattern tags)"
+        
+        # Get latest tag matching the branch version pattern
+        $gitTag = git tag -l $versionPattern | Sort-Object -Descending | Select-Object -First 1
+        
         if (-not $gitTag) {
-            Write-Warning "No v1 tags found. Creating v1.0.0"
-            git tag v1.0.0
-            $gitTag = "v1.0.0"
-        }
-    } elseif ($currentBranch -eq "v2") {
-        $gitTag = git tag -l "v2.*" | Sort-Object -Descending | Select-Object -First 1
-        if (-not $gitTag) {
-            Write-Warning "No v2 tags found. Creating v2.0.0"
-            git tag v2.0.0
-            $gitTag = "v2.0.0"
+            $defaultVersion = "v$branchVersion.0.0"
+            Write-Warning "No $versionPattern tags found. Creating $defaultVersion"
+            git tag $defaultVersion
+            $gitTag = $defaultVersion
         }
     } else {
-        # For main or other branches, use latest tag
+        # For main or other branches, use latest tag or default
+        Write-Info "Non-version branch: $currentBranch (using latest available tag)"
         $gitTag = git describe --tags --abbrev=0 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "No git tags found. Creating default tag v1.0.0"
