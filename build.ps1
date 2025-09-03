@@ -1,236 +1,60 @@
-# Complete Build Script for Go Executable with Windows Version Info
-# This script builds a Go executable with version information from git tags
-# that is visible both in command line and Windows Explorer
+# Quick Build Script
+# Simple version of the build script for basic usage
 
-param(
-    [string]$OutputName = "hello.exe",
-    [string]$CompanyName = "Test Company",
-    [string]$ProductName = "Hello World Application",
-    [string]$Description = "Go Hello World Example with Version Info",
-    [string]$Copyright = "Copyright (C) 2025"
-)
+# Get current branch name
+$currentBranch = git branch --show-current
 
-# Color functions for better output
-function Write-Success { param($Message) Write-Host $Message -ForegroundColor Green }
-function Write-Info { param($Message) Write-Host $Message -ForegroundColor Cyan }
-function Write-Warning { param($Message) Write-Host $Message -ForegroundColor Yellow }
-function Write-Error { param($Message) Write-Host $Message -ForegroundColor Red }
-
-Write-Info "=== Go Build Script with Windows Version Info ==="
-Write-Info "Output: $OutputName"
-
-# Step 1: Check prerequisites
-Write-Info "Checking prerequisites..."
-
-# Check if we're in a git repository
-if (-not (Test-Path ".git")) {
-    Write-Error "Error: Not in a git repository. Please run 'git init' first."
-    exit 1
+# Smart version detection based on branch pattern
+if ($currentBranch -match "^v(\d+)$") {
+    # Branch matches pattern v1, v2, v3, etc.
+    $branchVersion = $matches[1]
+    $versionPattern = "v$branchVersion.*"
+    
+    Write-Host "Detected version branch: $currentBranch (looking for $versionPattern tags)" -ForegroundColor Cyan
+    
+    # Get latest tag matching the branch version pattern
+    $version = git tag -l $versionPattern | Sort-Object -Descending | Select-Object -First 1
+    
+    if (-not $version) {
+        $defaultVersion = "v$branchVersion.0.0"
+        Write-Host "No $versionPattern tags found. Creating $defaultVersion..." -ForegroundColor Yellow
+        git tag $defaultVersion
+        $version = $defaultVersion
+    }
+} else {
+    # For main or other branches, use latest tag or default
+    Write-Host "Non-version branch: $currentBranch (using latest available tag)" -ForegroundColor Cyan
+    $version = git describe --tags --abbrev=0 2>$null
+    if (-not $version) {
+        Write-Host "No git tags found. Creating v1.0.0..." -ForegroundColor Yellow
+        git tag v1.0.0
+        $version = "v1.0.0"
+    }
 }
 
-# Check if Go is installed
-try {
-    $goVersion = go version 2>&1
-    Write-Success "Go found: $goVersion"
-} catch {
-    Write-Error "Error: Go is not installed or not in PATH"
-    exit 1
+$versionClean = $version.TrimStart('v')
+# Ensure 4-part version for Windows
+if ($versionClean.Split('.').Length -eq 3) {
+    $versionClean += ".0"
 }
+
+Write-Host "Building with version: $version" -ForegroundColor Cyan
 
 # Check if rcedit exists
 if (-not (Test-Path ".\rcedit.exe")) {
-    Write-Warning "rcedit.exe not found. Downloading..."
-    if (Test-Path ".\download-rcedit.ps1") {
-        & ".\download-rcedit.ps1"
-        if (-not (Test-Path ".\rcedit.exe")) {
-            Write-Error "Failed to download rcedit.exe"
-            exit 1
-        }
-    } else {
-        Write-Error "rcedit.exe not found and download script missing"
-        Write-Info "Please run: .\download-rcedit.ps1"
-        exit 1
-    }
+    Write-Host "Downloading rcedit..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri "https://github.com/electron/rcedit/releases/download/v1.1.1/rcedit-x64.exe" -OutFile "rcedit.exe"
 }
 
-# Step 2: Get version from git
-Write-Info "Getting version from git..."
+# Build the Go executable
+go build -ldflags "-X main.version=$version" -o hello.exe hello.go
 
-try {
-    # Get current branch name
-    $currentBranch = git branch --show-current
-    Write-Info "Current branch: $currentBranch"
-    
-    # Smart version detection based on branch pattern
-    if ($currentBranch -match "^v(\d+)$") {
-        # Branch matches pattern v1, v2, v3, etc.
-        $branchVersion = $matches[1]
-        $versionPattern = "v$branchVersion.*"
-        
-        Write-Info "Detected version branch: $currentBranch (looking for $versionPattern tags)"
-        
-        # Get latest tag matching the branch version pattern
-        $gitTag = git tag -l $versionPattern | Sort-Object -Descending | Select-Object -First 1
-        
-        if (-not $gitTag) {
-            $defaultVersion = "v$branchVersion.0.0"
-            Write-Warning "No $versionPattern tags found. Creating $defaultVersion"
-            git tag $defaultVersion
-            $gitTag = $defaultVersion
-        }
-    } else {
-        # For main or other branches, use latest tag or default
-        Write-Info "Non-version branch: $currentBranch (using latest available tag)"
-        $gitTag = git describe --tags --abbrev=0 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "No git tags found. Creating default tag v1.0.0"
-            git tag v1.0.0
-            $gitTag = "v1.0.0"
-        }
-    }
-    
-    Write-Success "Git tag: $gitTag"
-    
-    # Convert git tag to Windows version format (remove 'v' prefix, add .0 if needed)
-    $windowsVersion = $gitTag.TrimStart('v')
-    $versionParts = $windowsVersion.Split('.')
-    
-    # Ensure we have 4 version parts for Windows
-    while ($versionParts.Length -lt 4) {
-        $versionParts += "0"
-    }
-    
-    $windowsVersion = $versionParts[0..3] -join '.'
-    Write-Info "Windows version: $windowsVersion"
-    
-} catch {
-    Write-Error "Error getting git version: $_"
-    exit 1
-}
+# Add Windows version info
+.\rcedit.exe hello.exe --set-file-version $versionClean
+.\rcedit.exe hello.exe --set-product-version $versionClean
+.\rcedit.exe hello.exe --set-version-string "FileDescription" "Hello World Application"
+.\rcedit.exe hello.exe --set-version-string "ProductName" "Hello World"
+.\rcedit.exe hello.exe --set-version-string "CompanyName" "Test Company"
 
-# Step 3: Clean previous builds
-Write-Info "Cleaning previous builds..."
-if (Test-Path $OutputName) {
-    Remove-Item $OutputName -Force
-}
-
-# Step 4: Build Go executable
-Write-Info "Building Go executable..."
-
-try {
-    $buildArgs = @(
-        "build"
-        "-ldflags"
-        "-X main.version=$gitTag"
-        "-o"
-        $OutputName
-        "hello.go"
-    )
-    
-    Write-Info "Running: go $($buildArgs -join ' ')"
-    & go @buildArgs
-    
-    if ($LASTEXITCODE -ne 0) {
-        throw "Go build failed"
-    }
-    
-    if (-not (Test-Path $OutputName)) {
-        throw "Executable was not created"
-    }
-    
-    $fileSize = (Get-Item $OutputName).Length
-    Write-Success "Go build completed ($fileSize bytes)"
-    
-} catch {
-    Write-Error "Error building Go executable: $_"
-    exit 1
-}
-
-# Step 5: Add Windows version information
-Write-Info "Adding Windows version information..."
-
-try {
-    # Set file version
-    Write-Info "Setting file version to $windowsVersion"
-    & ".\rcedit.exe" $OutputName --set-file-version $windowsVersion
-    if ($LASTEXITCODE -ne 0) { throw "Failed to set file version" }
-    
-    # Set product version
-    Write-Info "Setting product version to $windowsVersion"
-    & ".\rcedit.exe" $OutputName --set-product-version $windowsVersion
-    if ($LASTEXITCODE -ne 0) { throw "Failed to set product version" }
-    
-    # Set version strings
-    $versionStrings = @{
-        "FileDescription" = $Description
-        "ProductName" = $ProductName
-        "CompanyName" = $CompanyName
-        "LegalCopyright" = $Copyright
-        "OriginalFilename" = $OutputName
-        "InternalName" = [System.IO.Path]::GetFileNameWithoutExtension($OutputName)
-        "FileVersion" = $windowsVersion
-        "ProductVersion" = $windowsVersion
-    }
-    
-    foreach ($key in $versionStrings.Keys) {
-        $value = $versionStrings[$key]
-        Write-Info "Setting $key to '$value'"
-        & ".\rcedit.exe" $OutputName --set-version-string $key $value
-        if ($LASTEXITCODE -ne 0) { throw "Failed to set $key" }
-    }
-    
-    Write-Success "Windows version info added successfully"
-    
-} catch {
-    Write-Error "Error adding Windows version info: $_"
-    exit 1
-}
-
-# Step 6: Verify the build
-Write-Info "Verifying build..."
-
-try {
-    # Test command line version
-    Write-Info "Testing command line version..."
-    $cliVersion = & ".\$OutputName" version 2>&1
-    Write-Success "Command line version: $cliVersion"
-    
-    # Test Windows version info
-    Write-Info "Testing Windows version info..."
-    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo(".\$OutputName")
-    Write-Success "File version: $($versionInfo.FileVersion)"
-    Write-Success "Product version: $($versionInfo.ProductVersion)"
-    
-    if ($versionInfo.FileVersion -eq $windowsVersion) {
-        Write-Success "Version info verification passed!"
-    } else {
-        Write-Warning "Version info may not be properly embedded"
-    }
-    
-} catch {
-    Write-Warning "Error during verification: $_"
-}
-
-# Step 7: Summary
-Write-Info ""
-Write-Info "=== Build Summary ==="
-Write-Success "✓ Executable: $OutputName"
-Write-Success "✓ Git tag: $gitTag"
-Write-Success "✓ Windows version: $windowsVersion"
-Write-Success "✓ Command line version: .\$OutputName version"
-Write-Success "✓ Windows Explorer: Right-click → Properties → Details"
-Write-Info ""
-Write-Info "Build completed successfully!"
-
-# Optional: Show file properties
-if ($PSVersionTable.PSVersion.Major -ge 5) {
-    try {
-        $fileInfo = Get-Item $OutputName
-        Write-Info "File details:"
-        Write-Info "  Size: $($fileInfo.Length) bytes"
-        Write-Info "  Created: $($fileInfo.CreationTime)"
-        Write-Info "  Modified: $($fileInfo.LastWriteTime)"
-    } catch {
-        # Ignore errors getting file info
-    }
-}
+Write-Host "Built hello.exe with version $version" -ForegroundColor Green
+Write-Host "Test with: .\hello.exe version" -ForegroundColor Cyan
